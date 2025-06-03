@@ -51,6 +51,17 @@ function cs_convert_price($price, $product) {
 }
 
 add_shortcode('currency_switcher', function () {
+    global $product;
+
+    if (!$product) {
+        return '';
+    }
+
+    $price = $product->get_price();
+    if (empty($price) || floatval($price) <= 0) {
+        return '';
+    }
+
     $currencies = cs_get_supported_currencies();
     $current = cs_get_current_currency();
 
@@ -68,5 +79,17 @@ add_shortcode('currency_switcher', function () {
 add_action('woocommerce_single_product_summary', 'cs_add_currency_switcher_after_price', 11);
 
 function cs_add_currency_switcher_after_price() {
+    global $product;
+
+    if (!$product) {
+        return;
+    }
+
+    $price = $product->get_price();
+
+    if (empty($price) || floatval($price) <= 0) {
+        return;
+    }
+
     echo '<div class="cs-switcher-after-price" style="margin-top: 10px;">' . do_shortcode('[currency_switcher]') . '</div>';
 }

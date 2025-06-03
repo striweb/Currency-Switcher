@@ -52,7 +52,7 @@ function cs_admin_page_callback() {
                 }
 
                 if (!isset($bnb_rates['EUR'])) {
-                  $bnb_rates['EUR'] = round(1 / 1.95583, 6); // ~0.51129
+                  $bnb_rates['EUR'] = round(1 / 1.95583, 6);
                 }
 
             }
@@ -83,21 +83,21 @@ function cs_admin_page_callback() {
                         <tr>
                             <td><input type="text" name="currency_code[]" value="<?php echo esc_attr($code); ?>" required></td>
                             <td>
-    <input type="text"
-           name="currency_rate[]"
-           value="<?php echo esc_attr($current_rate); ?>"
-           required
-           class="cs-rate-input"
-           data-code="<?php echo esc_attr($code); ?>">
-    <?php if ($rate_diff): ?>
-        <div class="cs-rate-update"
-             data-code="<?php echo esc_attr($code); ?>"
-             data-bnb-rate="<?php echo esc_attr($bnb_rate); ?>">
-            → <strong><?php echo esc_html($bnb_rate); ?></strong>
-            <button type="button" class="button small cs-rate-apply">Обнови</button>
-        </div>
-    <?php endif; ?>
-</td>
+                                <input type="text"
+                                      name="currency_rate[]"
+                                      value="<?php echo esc_attr($current_rate); ?>"
+                                      required
+                                      class="cs-rate-input"
+                                      data-code="<?php echo esc_attr($code); ?>">
+                                <?php if ($rate_diff): ?>
+                                    <div class="cs-rate-update"
+                                        data-code="<?php echo esc_attr($code); ?>"
+                                        data-bnb-rate="<?php echo esc_attr($bnb_rate); ?>">
+                                        → <strong><?php echo esc_html($bnb_rate); ?></strong>
+                                        <button type="button" class="button small cs-rate-apply">Обнови</button>
+                                    </div>
+                                <?php endif; ?>
+                            </td>
 
                             <td><input type="text" name="currency_symbol[]" value="<?php echo esc_attr($data['symbol']); ?>" required></td>
                             <td><button type="button" class="button cs-remove">X</button></td>
