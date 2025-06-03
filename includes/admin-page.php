@@ -16,7 +16,6 @@ function cs_register_admin_page() {
 function cs_admin_page_callback() {
     $currencies = get_option('cs_custom_currencies', []);
 
-    // При запис
     if (isset($_POST['cs_save_currencies'])) {
         $new_data = [];
         if (isset($_POST['currency_code']) && is_array($_POST['currency_code'])) {
@@ -88,7 +87,6 @@ function cs_admin_page_callback() {
 }
 
 
-// 🔽 Функция за зареждане на БНБ курсовете
 function cs_get_bnb_exchange_rates() {
     $url = 'https://www.bnb.bg/Statistics/StExternalSector/StExchangeRates/StERForeignCurrencies/index.htm?download=xml&lang=BG';
 
