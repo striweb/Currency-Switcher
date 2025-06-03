@@ -16,7 +16,6 @@ function cs_register_admin_page() {
 function cs_admin_page_callback() {
     $currencies = get_option('cs_custom_currencies', []);
 
-    // Проверка и запис при submit
     if (isset($_POST['cs_save_currencies'])) {
         $new_data = [];
         if (isset($_POST['currency_code']) && is_array($_POST['currency_code'])) {
@@ -34,7 +33,6 @@ function cs_admin_page_callback() {
         echo '<div class="updated"><p>Настройките са запазени.</p></div>';
     }
 
-    // Извличане на курсовете от БНБ
     $bnb_rates = [];
     $url = 'https://www.bnb.bg/Statistics/StExternalSector/StExchangeRates/StERForeignCurrencies/index.htm?download=xml&lang=BG';
     $response = wp_remote_get($url);
@@ -46,9 +44,19 @@ function cs_admin_page_callback() {
                 $code = (string)$row->CODE;
                 $rate = floatval(str_replace(',', '.', (string)$row->RATE));
                 $amount = intval((string)$row->AMOUNT);
-                if ($amount > 0) $rate = $rate / $amount;
-                $bnb_rates[$code] = round($rate, 6);
+                if ($amount > 0) {
+                    $rate = $rate / $amount;
+                }
+                if ($rate > 0) {
+                    $bnb_rates[$code] = round(1 / $rate, 6);
+                }
+
+                if (!isset($bnb_rates['EUR'])) {
+                  $bnb_rates['EUR'] = round(1 / 1.95583, 6); // ~0.51129
+                }
+
             }
+            
         }
     }
 
@@ -147,33 +155,37 @@ function cs_admin_page_callback() {
         }
 
         if (e.target.classList.contains('cs-copy-rate')) {
-            const code = e.target.getAttribute('data-code');
-            const rate = e.target.getAttribute('data-rate');
+    const code = e.target.getAttribute('data-code');
+    let rate = parseFloat(e.target.getAttribute('data-rate'));
 
-            const rows = document.querySelectorAll('#cs-currency-rows tr');
+    if (!isNaN(rate) && rate > 0) {
+        rate = (1 / rate).toFixed(6);
+    }
 
-            let found = false;
-            rows.forEach(row => {
-                const codeInput = row.querySelector('input[name="currency_code[]"]');
-                const rateInput = row.querySelector('input[name="currency_rate[]"]');
+    const rows = document.querySelectorAll('#cs-currency-rows tr');
 
-                if (codeInput && rateInput && codeInput.value.toUpperCase() === code) {
-                    rateInput.value = rate;
-                    rateInput.focus();
-                    rateInput.style.backgroundColor = '#d4ffd4';
-                    setTimeout(() => rateInput.style.backgroundColor = '', 1000);
-                    found = true;
-                }
-            });
+    let found = false;
+    rows.forEach(row => {
+        const codeInput = row.querySelector('input[name="currency_code[]"]');
+        const rateInput = row.querySelector('input[name="currency_rate[]"]');
 
-            if (!found) {
-                alert('Валутата ' + code + ' не е добавена. Моля, добавете я първо ръчно.');
-            }
+        if (codeInput && rateInput && codeInput.value.toUpperCase() === code) {
+            rateInput.value = rate;
+            rateInput.focus();
+            rateInput.style.backgroundColor = '#d4ffd4';
+            setTimeout(() => rateInput.style.backgroundColor = '', 1000);
+            found = true;
         }
     });
 
+    if (!found) {
+        alert('Валутата ' + code + ' не е добавена. Моля, добавете я първо ръчно.');
+    }
+}
+
+    });
+
     document.addEventListener('click', function (e) {
-    // Обработва "Обнови" бутон
     if (e.target.classList.contains('cs-rate-apply')) {
         const wrapper = e.target.closest('.cs-rate-update');
         const code = wrapper.getAttribute('data-code');
@@ -215,7 +227,7 @@ function cs_get_bnb_exchange_rates() {
     }
 
     $output = '<table class="widefat striped" style="max-width:600px;">';
-    $output .= '<thead><tr><th>Валута</th><th>Курс</th><th>Единици</th><th>Действие</th></tr></thead><tbody>';
+    $output .= '<thead><tr><th>Валута</th><th>Курс</th><th>Действие</th></tr></thead><tbody>';
 
     foreach ($xml->ROW as $row) {
         $code = (string)$row->CODE;
@@ -223,11 +235,16 @@ function cs_get_bnb_exchange_rates() {
         $quantity = (string)$row->AMOUNT;
 
         $output .= "<tr data-currency-code='{$code}' data-currency-rate='{$rate}' data-currency-amount='{$quantity}'>";
-        $output .= "<td>{$code}</td><td>{$rate}</td><td>{$quantity}</td>";
+        $output .= "<td>{$code}</td><td>{$rate}</td>";
         $output .= "<td><button type='button' class='button cs-copy-rate' data-code='{$code}' data-rate='{$rate}'>Копирай</button></td>";
         $output .= "</tr>";
     }
 
+    $eur_rate = '1.95583';
+    $output .= "<tr data-currency-code='EUR' data-currency-rate='{$eur_rate}' data-currency-amount='1'>";
+    $output .= "<td>EUR</td><td>{$eur_rate}</td>";
+    $output .= "<td><button type='button' class='button cs-copy-rate' data-code='EUR' data-rate='{$eur_rate}'>Копирай</button></td>";
+    $output .= "</tr>";
     $output .= '</tbody></table>';
 
     return $output;
