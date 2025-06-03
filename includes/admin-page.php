@@ -16,6 +16,7 @@ function cs_register_admin_page() {
 function cs_admin_page_callback() {
     $currencies = get_option('cs_custom_currencies', []);
 
+    // Проверка и запис при submit
     if (isset($_POST['cs_save_currencies'])) {
         $new_data = [];
         if (isset($_POST['currency_code']) && is_array($_POST['currency_code'])) {
@@ -33,6 +34,24 @@ function cs_admin_page_callback() {
         echo '<div class="updated"><p>Настройките са запазени.</p></div>';
     }
 
+    // Извличане на курсовете от БНБ
+    $bnb_rates = [];
+    $url = 'https://www.bnb.bg/Statistics/StExternalSector/StExchangeRates/StERForeignCurrencies/index.htm?download=xml&lang=BG';
+    $response = wp_remote_get($url);
+    if (!is_wp_error($response)) {
+        $body = wp_remote_retrieve_body($response);
+        $xml = simplexml_load_string($body);
+        if ($xml) {
+            foreach ($xml->ROW as $row) {
+                $code = (string)$row->CODE;
+                $rate = floatval(str_replace(',', '.', (string)$row->RATE));
+                $amount = intval((string)$row->AMOUNT);
+                if ($amount > 0) $rate = $rate / $amount;
+                $bnb_rates[$code] = round($rate, 6);
+            }
+        }
+    }
+
     ?>
     <div class="wrap">
         <h1>Currency Switcher настройки</h1>
@@ -47,10 +66,31 @@ function cs_admin_page_callback() {
                     </tr>
                 </thead>
                 <tbody id="cs-currency-rows">
-                    <?php foreach ($currencies as $code => $data): ?>
+                    <?php foreach ($currencies as $code => $data):
+                        $code = strtoupper($code);
+                        $current_rate = floatval($data['rate']);
+                        $bnb_rate = isset($bnb_rates[$code]) ? $bnb_rates[$code] : null;
+                        $rate_diff = $bnb_rate !== null && abs($current_rate - $bnb_rate) > 0.0001;
+                    ?>
                         <tr>
                             <td><input type="text" name="currency_code[]" value="<?php echo esc_attr($code); ?>" required></td>
-                            <td><input type="text" name="currency_rate[]" value="<?php echo esc_attr($data['rate']); ?>" required></td>
+                            <td>
+    <input type="text"
+           name="currency_rate[]"
+           value="<?php echo esc_attr($current_rate); ?>"
+           required
+           class="cs-rate-input"
+           data-code="<?php echo esc_attr($code); ?>">
+    <?php if ($rate_diff): ?>
+        <div class="cs-rate-update"
+             data-code="<?php echo esc_attr($code); ?>"
+             data-bnb-rate="<?php echo esc_attr($bnb_rate); ?>">
+            → <strong><?php echo esc_html($bnb_rate); ?></strong>
+            <button type="button" class="button small cs-rate-apply">Обнови</button>
+        </div>
+    <?php endif; ?>
+</td>
+
                             <td><input type="text" name="currency_symbol[]" value="<?php echo esc_attr($data['symbol']); ?>" required></td>
                             <td><button type="button" class="button cs-remove">X</button></td>
                         </tr>
@@ -64,6 +104,30 @@ function cs_admin_page_callback() {
         <h2 style="margin-top:40px;">Курсове от БНБ (днес)</h2>
         <?php echo cs_get_bnb_exchange_rates(); ?>
     </div>
+
+    <style>
+    .cs-rate-warning {
+        margin-left: 6px;
+        color: #d98400;
+        font-size: 16px;
+        cursor: help;
+    }
+    .cs-rate-update {
+    display: inline-block;
+    margin-left: 8px;
+    color: #d98400;
+    font-size: 13px;
+}
+
+.cs-rate-update button.cs-rate-apply {
+    margin-left: 5px;
+    padding: 2px 6px;
+    font-size: 11px;
+    height: auto;
+    line-height: 1.2;
+}
+
+    </style>
 
     <script>
     document.getElementById('cs-add').addEventListener('click', function () {
@@ -81,11 +145,58 @@ function cs_admin_page_callback() {
         if (e.target.classList.contains('cs-remove')) {
             e.target.closest('tr').remove();
         }
+
+        if (e.target.classList.contains('cs-copy-rate')) {
+            const code = e.target.getAttribute('data-code');
+            const rate = e.target.getAttribute('data-rate');
+
+            const rows = document.querySelectorAll('#cs-currency-rows tr');
+
+            let found = false;
+            rows.forEach(row => {
+                const codeInput = row.querySelector('input[name="currency_code[]"]');
+                const rateInput = row.querySelector('input[name="currency_rate[]"]');
+
+                if (codeInput && rateInput && codeInput.value.toUpperCase() === code) {
+                    rateInput.value = rate;
+                    rateInput.focus();
+                    rateInput.style.backgroundColor = '#d4ffd4';
+                    setTimeout(() => rateInput.style.backgroundColor = '', 1000);
+                    found = true;
+                }
+            });
+
+            if (!found) {
+                alert('Валутата ' + code + ' не е добавена. Моля, добавете я първо ръчно.');
+            }
+        }
     });
+
+    document.addEventListener('click', function (e) {
+    // Обработва "Обнови" бутон
+    if (e.target.classList.contains('cs-rate-apply')) {
+        const wrapper = e.target.closest('.cs-rate-update');
+        const code = wrapper.getAttribute('data-code');
+        const rate = wrapper.getAttribute('data-bnb-rate');
+
+        const rows = document.querySelectorAll('#cs-currency-rows tr');
+        rows.forEach(row => {
+            const codeInput = row.querySelector('input[name="currency_code[]"]');
+            const rateInput = row.querySelector('input[name="currency_rate[]"]');
+
+            if (codeInput && rateInput && codeInput.value.toUpperCase() === code) {
+                rateInput.value = rate;
+                rateInput.focus();
+                rateInput.style.backgroundColor = '#d4ffd4';
+                setTimeout(() => rateInput.style.backgroundColor = '', 1000);
+            }
+        });
+    }
+});
+
     </script>
 <?php
 }
-
 
 function cs_get_bnb_exchange_rates() {
     $url = 'https://www.bnb.bg/Statistics/StExternalSector/StExchangeRates/StERForeignCurrencies/index.htm?download=xml&lang=BG';
@@ -104,13 +215,17 @@ function cs_get_bnb_exchange_rates() {
     }
 
     $output = '<table class="widefat striped" style="max-width:600px;">';
-    $output .= '<thead><tr><th>Валута</th><th>Курс</th><th>Единици</th></tr></thead><tbody>';
+    $output .= '<thead><tr><th>Валута</th><th>Курс</th><th>Единици</th><th>Действие</th></tr></thead><tbody>';
 
     foreach ($xml->ROW as $row) {
         $code = (string)$row->CODE;
-        $rate = (string)$row->RATE;
+        $rate = str_replace(',', '.', (string)$row->RATE);
         $quantity = (string)$row->AMOUNT;
-        $output .= "<tr><td>{$code}</td><td>{$rate}</td><td>{$quantity}</td></tr>";
+
+        $output .= "<tr data-currency-code='{$code}' data-currency-rate='{$rate}' data-currency-amount='{$quantity}'>";
+        $output .= "<td>{$code}</td><td>{$rate}</td><td>{$quantity}</td>";
+        $output .= "<td><button type='button' class='button cs-copy-rate' data-code='{$code}' data-rate='{$rate}'>Копирай</button></td>";
+        $output .= "</tr>";
     }
 
     $output .= '</tbody></table>';
