@@ -1,0 +1,7 @@
+.currency-switcher {
+  display: inline-block;
+  margin: 10px;
+}
+.currency-switcher select {
+  padding: 4px;
+}
